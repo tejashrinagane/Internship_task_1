@@ -1,0 +1,123 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+from scipy.stats import zscore
+
+# --- 1. Load the Dataset and Initial Exploration (Task Step 1) ---
+
+# Load the dataset
+try:
+    df = pd.read_csv('Titanic-Dataset.csv', encoding='latin-1')
+    print("Dataset Loaded Successfully.")
+except FileNotFoundError:
+    print("Error: 'Titanic-Dataset.csv' not found. Please ensure the file is in the correct directory.")
+    exit()
+
+print("\n--- Initial Data Information ---")
+print(df.info())
+print("\nMissing Values Count (Before Cleaning):")
+print(df.isnull().sum())
+print("\nFirst 5 rows of the dataset:")
+print(df.head())
+
+# --- 2. Handle Missing Values (Task Step 2) ---
+
+# A. Handle 'Age' (Numerical): Impute with the median
+median_age = df['Age'].median()
+df['Age'].fillna(median_age, inplace=True)
+print(f"\nImputed 'Age' missing values with the median: {median_age}")
+
+# B. Handle 'Embarked' (Categorical): Impute with the mode
+mode_embarked = df['Embarked'].mode()[0]
+df['Embarked'].fillna(mode_embarked, inplace=True)
+print(f"Imputed 'Embarked' missing values with the mode: {mode_embarked}")
+
+# C. Handle 'Cabin' (Too many missing values): Drop the column
+df.drop('Cabin', axis=1, inplace=True)
+print("Dropped 'Cabin' column due to excessive missing values.")
+
+# Verification after null handling
+print("\nMissing Values Count (After Cleaning):")
+print(df.isnull().sum())
+
+# --- 3. Visualize and Handle Outliers (Task Step 5) ---
+
+# Focus on 'Fare' and 'Age' for outlier detection
+
+# Visualize 'Fare' outliers
+plt.figure(figsize=(10, 4))
+plt.subplot(1, 2, 1)
+sns.boxplot(y=df['Fare'])
+plt.title('Fare Boxplot')
+
+# Visualize 'Age' outliers
+plt.subplot(1, 2, 2)
+sns.boxplot(y=df['Age'])
+plt.title('Age Boxplot')
+plt.tight_layout()
+plt.show() # 
+
+
+
+
+# Outlier Treatment for 'Fare' using IQR method (Capping/Removal)
+# For this task, we will remove them for simplicity (as requested by "remove them").
+Q1 = df['Fare'].quantile(0.25)
+Q3 = df['Fare'].quantile(0.75)
+IQR = Q3 - Q1
+lower_bound = Q1 - 1.5 * IQR
+upper_bound = Q3 + 1.5 * IQR
+
+# Filtering the DataFrame to remove outliers
+df_cleaned = df[(df['Fare'] >= lower_bound) & (df['Fare'] <= upper_bound)].copy()
+print(f"\nRemoved {len(df) - len(df_cleaned)} rows containing 'Fare' outliers (IQR Method).")
+print(f"New dataset shape: {df_cleaned.shape}")
+
+# Note: Outliers in 'Age' are generally kept or clipped as they represent real data.
+df = df_cleaned # Use the DataFrame after outlier removal
+
+# --- 4. Convert Categorical Features (Encoding) (Task Step 3) ---
+
+# Drop non-essential columns for modeling
+df.drop(['PassengerId', 'Name', 'Ticket'], axis=1, inplace=True)
+
+# A. One-Hot Encoding for Nominal features ('Embarked', 'Sex')
+nominal_cols = ['Embarked', 'Sex']
+df = pd.get_dummies(df, columns=nominal_cols, drop_first=True, dtype=int) 
+# drop_first=True avoids multicollinearity
+
+# B. Label Encoding is not strictly necessary here, but often used for ordinal features.
+# Since 'Pclass' is treated as a nominal categorical feature in most models,
+# we can skip Label Encoding unless explicitly required for an ordinal feature.
+
+print("\n--- After Encoding and Dropping Columns ---")
+print(df.head())
+print("\nFinal Data Info before Scaling:")
+print(df.info())
+
+# --- 5. Normalize/Standardize Numerical Features (Task Step 4) ---
+
+# Identify numerical features for scaling (excluding the 'Survived' target variable and encoded columns)
+# Features to scale: 'Age', 'SibSp', 'Parch', 'Fare'
+numerical_cols = ['Age', 'SibSp', 'Parch', 'Fare']
+
+# A. Standardization (Using StandardScaler)
+# Recommended when features follow a Gaussian/Normal distribution.
+standard_scaler = StandardScaler()
+df[numerical_cols] = standard_scaler.fit_transform(df[numerical_cols])
+print("\n--- Standardization Applied (StandardScaler) ---")
+
+# B. Normalization (MinMaxScaler) - Uncomment to use instead of Standardization
+# minmax_scaler = MinMaxScaler()
+# df[numerical_cols] = minmax_scaler.fit_transform(df[numerical_cols])
+# print("\n--- Normalization Applied (MinMaxScaler) ---")
+
+
+# --- Final Result ---
+print("\n--- Final Preprocessed Data Head (Ready for ML Model) ---")
+print(df.head())
+
+# Optional: Save the final processed data
+# df.to_csv('titanic_preprocessed.csv', index=False)
